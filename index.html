@@ -1,0 +1,204 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+  <link rel="stylesheet" type="text/css" href="css/styles.css">
+  <script type="text/javascript" src="js/chartColors.js"></script>
+  <script type="text/javascript" src="js/Charts.js"></script>
+  <script type="text/javascript" src="js/Functions.js"></script>
+
+  <!--- Lib -->
+  <script type="text/javascript" src="Chart.js/chart.bundle.js"></script>
+  <script type="text/javascript" src="chartjs-plugin-zoom/hammer.min.js"></script>
+  <script type="text/javascript" src="chartjs-plugin-zoom/chartjs-plugin-zoom.js"></script>
+
+</head>
+
+<body>
+<div style= "width: calc(30% - 25px); height: 100%; position:absolute; left: 10px;">
+
+    <div class="w3-light-grey" type="text" id="SpeedText" style= "width:100%; margin: 2px 0" > Speed: 0 m/s </div>
+    <div class="w3-light-grey" type="text" id="AccelerateText" style= "width:100%; margin: 2px 0"> Accelerate: 0 m/s <sup>2</sup> </div>
+    <div class="w3-light-grey" type="text" id="GText" style= "width:100%; margin: 2px 0"> g: 9,8 m/s <sup>2</sup> </div>
+    <div class="w3-light-grey" type="text" id="HeightText" style= "width:100%; margin: 2px 0;"> Height: 0 m </div>
+
+    <div class="w3-light-grey" style= "width:100%; margin: 2px 0;"> 
+      <div class="w3-green" type="text" id="FuelBar" style= "width:100%"> 
+        <div type = "text" id = "FuelText"> Fuel: 100% </div>
+      </div>
+    </div>
+
+    <canvas id = "animation" style= "width: 100%; height: 55%"> </canvas>
+
+    <div style= "width: 100%">
+      <fieldset>
+      <legend>Default data</legend>
+      <div>
+        <div>
+            <label style = "width: 40%"> Mass of the ship(tons) </label>
+            <input style = "width: 59%" type="number" id = "MassInput">
+        </div>
+
+          <div>
+            <label style = "width: 40%"> Gas speed(m/s) </label>
+            <input style = "width: 59%" type="number" id = "GasSpeedInput">
+          </div>
+
+          <div>
+            <label style = "width: 40%"> Capacity(tons) </label>
+            <input style = "width: 59%" type="number" id = "MaxFuelInput">
+          </div>
+
+          <div>
+            <label style = "width: 40%"> I (tons/s) </label>
+            <input style = "width: 59%" type="number" id = "IInput">
+          </div>
+        </div>
+      </fieldset>  
+
+      <center>
+        <button class="button" id="CurrentButton" style = "width: 40%" onclick = "CurrentClick()"> Current </button>
+        <button class="button" id="ChangeButton" style = "width: 40%" onclick = "ChangeClick()"> Change </button>
+      </center>
+
+    </div>
+
+</div>
+
+<div style= "width:70%; height: 100%; position:absolute; right: 10px;">
+
+  <div class="tab">
+  <center>
+    <button id = "TabVel" class="tablinks" onclick="openTab(event, 'tabVel')">V(t)</button>
+    <button id = "TabA" class="tablinks" onclick="openTab(event, 'tabA')">a(t)</button>
+    <button id = "TabH" class="tablinks" onclick="openTab(event, 'tabH')">H(t)</button>
+    <button id = "TabFuel" class="tablinks" onclick="openTab(event, 'tabFuel')">Fuel(t)</button>
+  </center>
+  </div>
+
+  <div id = "tabVel" class = "tabcontent">
+    <canvas id="Velocity"></canvas>
+  </div>
+
+  <div id = "tabA" class = "tabcontent">
+    <canvas id="Accelerate"></canvas>
+  </div>
+
+  <div id = "tabH" class = "tabcontent">
+    <canvas id="Height"></canvas>
+  </div>
+
+  <div id = "tabFuel" class = "tabcontent">
+    <canvas id="Fuel"></canvas>
+  </div>
+
+  <br><br>
+  <center>
+    <button class="button" id="Cycle" style = "width: 23%" onclick = "PlayClick()"> Play </button>
+    <button class="button" id="Reset" style = "width: 23%" onclick = "ResetClick()" > Reset </button>
+    <button class="button" id="ResetZoom" style = "width: 23%" onclick = "ResetZoomClick()"> ResetZoom </button>
+    <button class="button" id="pointVis" style = "width: 23%" onclick = "PointVisClick()"> Visiable Points </button>
+    <br>
+  </center>
+
+  <center>
+    <input type="number" id="AddFuelText" value="100" style = "width: 70%; height: 40px">
+    <button class="button" id="AddFuel" style = "width: 25%" onclick = "AddFuelClick()"> Add fuel (tons) </button>
+  </center>
+</div>
+</body>
+
+<script type="text/javascript">
+// const 
+var u = 3600;   // скорость газов м/c
+var I = 100;    // скорость сгорания топлива т/с
+var m0 = 5000;  // начальная масса ракеты т
+var maxFuel = 10000;  // вместимость бака т
+var delay = 0.1; // частота обновления c
+
+var G = 6.67 * 1e-11; // гравитационная постоянная
+var M = 6 * 1e24; // масса земли
+var R = 6371 * 1e3; // радиус земли
+
+// values
+var curV;
+var curFuel; 
+var curH;
+var curA;
+var CurAWithoutG;
+var curT;
+var g;
+
+// var for animation
+var rocketOn = new Image();
+var rocketOff = new Image();
+var bg1 = new Image();
+var bg2 = new Image();
+
+// service var
+var pause;
+var curChart;
+var MassChanged; // only for change accelerate
+
+// animation
+var dynamicCanvas;
+var dynamicContext;
+
+window.onresize = function(event) {
+    document.getElementById("FuelText").style.width = (document.body.clientWidth * 0.3 - 25) + "px";
+};
+
+window.onload = function() {
+    // prepare to draw animation
+    dynamicCanvas = document.createElement("canvas");
+    dynamicContext = dynamicCanvas.getContext("2d");
+    dynamicCanvas.width = "1280";
+    dynamicCanvas.height = "720";
+    bg1.coorX = 0;
+    bg1.coorY = 0;
+    bg2.coorX = 0;
+    bg2.coorY = -dynamicCanvas.height;
+
+    ResetArg();
+    Chart.defaults.global.legend.display = false;
+
+    // make charts
+    VelocityInit();
+    AccelerateInit();
+    HeightInit();
+    FuelInit();
+
+    // open V(t)
+    document.getElementById("TabVel").click();
+
+    // open image
+    rocketOn.src = "assets/rocket_on.png";
+    rocketOff.src = "assets/rocket_off.png";
+    bg1.src = "assets/fon.jpg";
+    bg2.src = "assets/fon.jpg";
+    
+    // start game loop
+    setInterval(mainLoop, delay * 1000);
+};
+
+// game loop
+var mainLoop = function(){
+  ChartsScaleUpdate();
+  animationUpdate();
+
+  if(pause) return;
+
+  VelocityUpdate();
+  AccelerateUpdate();
+  HeightUpdate();
+  FuelUpdate();
+
+  textUpdate();
+
+  UpdateArg();
+};
+</script>
+
+</html>

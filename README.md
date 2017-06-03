@@ -1,3 +1,3 @@
 # RocketEmu
 Emulator rocket launch
-[![rocket gif](start.gif)]
+![rocket gif](start.gif)
